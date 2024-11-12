@@ -318,11 +318,12 @@ int nitroFSOpen(struct _reent *r, void *fileStruct, const char *path,int flags,i
 	return(-1);	//teh fail
 }
 
-int nitroFSClose(struct _reent *r,int fd) {
+int nitroFSClose(struct _reent *r,void *fd) {
 	return(0);
 }
 
-int nitroFSRead(struct _reent *r,int fd,char *ptr,int len) {
+int nitroFSRead(struct _reent *r,void *fd,char *ptr, unsigned int len) {
+	
 	struct nitroFSStruct *fatStruct=(struct nitroFSStruct *)fd;
 	unsigned int *npos=&fatStruct->pos;
 	if(*npos+len > fatStruct->end) 
@@ -332,7 +333,7 @@ int nitroFSRead(struct _reent *r,int fd,char *ptr,int len) {
 	return(nitroSubRead(npos,ptr,len));
 }
 
-int nitroFSSeek(struct _reent *r,int fd,int pos,int dir) {
+long long int nitroFSSeek(struct _reent *r,void *fd,long long int pos,int dir) {
 	//need check for eof here...
 	struct nitroFSStruct *fatStruct=(struct nitroFSStruct *)fd;
 	unsigned int *npos=&fatStruct->pos;
@@ -346,7 +347,7 @@ int nitroFSSeek(struct _reent *r,int fd,int pos,int dir) {
 	return(*npos-fatStruct->start);
 }
 
-int nitroFSFstat(struct _reent *r,int fd,struct stat *st) {
+int nitroFSFstat(struct _reent *r,void *fd,struct stat *st) {
 	struct nitroFSStruct *fatStruct=(struct nitroFSStruct *)fd;
 	st->st_size=fatStruct->end-fatStruct->start;
 	return(0);	

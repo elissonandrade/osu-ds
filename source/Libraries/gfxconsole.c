@@ -197,8 +197,9 @@ static void gfxConsoleClearLine(char mode) {
 }
 
 //---------------------------------------------------------------------------------
-ssize_t gfxnocash_write(struct _reent *r, int fd, const char *ptr, size_t len) {
+ssize_t gfxnocash_write(struct _reent *r, void* fd,const char *ptr, size_t len) {
 	//---------------------------------------------------------------------------------
+	
 	int count = 0;
 
 	if(!ptr || len <= 0) return -1;
@@ -217,9 +218,9 @@ ssize_t gfxnocash_write(struct _reent *r, int fd, const char *ptr, size_t len) {
 
 
 //---------------------------------------------------------------------------------
-ssize_t gfxcon_write(struct _reent *r,int fd,const char *ptr, size_t len) {
+ssize_t gfxcon_write(struct _reent *r,void* fd,const char *ptr, size_t len) {
 	//---------------------------------------------------------------------------------
-	
+	int fd_int = (int)(intptr_t)fd;
 	char chr;
 
 	int i, count = 0;

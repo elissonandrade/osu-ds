@@ -54,10 +54,10 @@ int nitroDirReset(struct _reent *r, DIR_ITER *dirState);
 int nitroFSDirNext(struct _reent *r, DIR_ITER *dirState, char *filename, struct stat *st);
 int nitroFSDirClose(struct _reent *r, DIR_ITER *dirState);
 int nitroFSOpen(struct _reent *r, void *fileStruct, const char *path,int flags,int mode);
-int nitroFSClose(struct _reent *r,int fd);
-int nitroFSRead(struct _reent *r,int fd,char *ptr,int len);
-int nitroFSSeek(struct _reent *r,int fd,int pos,int dir);
-int nitroFSFstat(struct _reent *r,int fd,struct stat *st);
+int nitroFSClose(struct _reent *r,void *fd);
+int nitroFSRead(struct _reent *r,void *fd,char *ptr,unsigned int len);
+long long int nitroFSSeek(struct _reent *r,void *fd,long long int pos,int dir);
+int nitroFSFstat(struct _reent *r,void *fd,struct stat *st);
 int nitroFSstat(struct _reent *r,const char *file,struct stat *st);
 int nitroFSChdir(struct _reent *r,const char *name);
 #define LOADERSTR	"PASS"	//look for this
