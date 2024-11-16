@@ -8,13 +8,48 @@ TreeNode::TreeNode(const std::string& k, double v)
     : key(k), type(NodeType::NUMBER), value(v) {}
 
 TreeNode::TreeNode(const std::string& k, NodeType t)
-    : key(k), type(t), value(std::vector<std::shared_ptr<TreeNode>>{}) {}
+    : key(k), type(t){
+		
+    if (type == NodeType::OBJECT) {
+        value = std::unordered_map<std::string, std::shared_ptr<TreeNode>>{};
+    } else if (type == NodeType::ARRAY) {
+        value = std::vector<std::shared_ptr<TreeNode>>{};
+    } else if (type == NodeType::STRING) {
+        value = std::string{};  // Ou um valor padrão para String
+    } else if (type == NodeType::NUMBER) {
+        value = 0.0;  // Ou um valor padrão para Número
+    }
+}
 
 // Função para adicionar um filho
 void TreeNode::addChild(std::shared_ptr<TreeNode> child) {
-    if (type == NodeType::OBJECT || type == NodeType::ARRAY) {
+    if (type == NodeType::OBJECT) {
+        std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(value)[child->key] = child;
+    } else if (type == NodeType::ARRAY) {
         std::get<std::vector<std::shared_ptr<TreeNode>>>(value).push_back(child);
     }
+}
+
+// Função para acessar um filho por chave (somente para objetos)
+std::shared_ptr<TreeNode> TreeNode::getChild(const std::string& key) {
+    if (type == NodeType::OBJECT) {
+        auto& children = std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(value);
+        if (children.find(key) != children.end()) {
+            return children[key];
+        }
+    }
+    return nullptr;
+}
+
+// Função para acessar um filho por índice (somente para arrays)
+std::shared_ptr<TreeNode> TreeNode::getChildAt(size_t index) {
+    if (type == NodeType::ARRAY) {
+        auto& children = std::get<std::vector<std::shared_ptr<TreeNode>>>(value);
+        if (index < children.size()) {
+            return children[index];
+        }
+    }
+    return nullptr;
 }
 
 // Função recursiva para imprimir a árvore
@@ -30,13 +65,20 @@ void TreeNode::printTree(int depth) const {
         case NodeType::NUMBER:
             std::cout << std::get<double>(value) << "\n";
             break;
-        case NodeType::OBJECT:
-        case NodeType::ARRAY: {
+        case NodeType::OBJECT: {
             std::cout << "{\n";
+            for (const auto& child : std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(value)) {
+                child.second->printTree(depth + 1);
+            }
+            std::cout << indent << "}\n";
+            break;
+        }
+        case NodeType::ARRAY: {
+            std::cout << "[\n";
             for (const auto& child : std::get<std::vector<std::shared_ptr<TreeNode>>>(value)) {
                 child->printTree(depth + 1);
             }
-            std::cout << indent << "}\n";
+            std::cout << indent << "]\n";
             break;
         }
     }

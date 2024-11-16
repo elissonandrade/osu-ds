@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <cctype>
+#include <algorithm>
 
 // Função que divide a string com base no delimitador
 std::vector<std::string> split(const std::string &str, char delimiter) {
@@ -51,7 +52,7 @@ void populateTreeFromFile(const std::string& filename, std::shared_ptr<TreeNode>
 
     while (std::getline(file, line)) {
         line = trim(line);
-        if (line.find("osu file format 14") == 0) continue; // Ignora cabeçalho
+        if (line.find("osu file format ") == 0) continue; // Ignora cabeçalho
 
         // Separar chave e valor (esperando um formato "key: value")
         size_t delimiterPos = line.find(":");
@@ -73,7 +74,24 @@ void populateTreeFromFile(const std::string& filename, std::shared_ptr<TreeNode>
             nodeStack.push_back(newNode);
         } else if (line.find(",") != std::string::npos) {
             // Início de um array
-            auto newNode = std::make_shared<TreeNode>("", NodeType::ARRAY);
+			std::string properKey = "0";
+			if((nodeStack.back()->type) == NodeType::OBJECT){
+				auto parentMap = std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(nodeStack.back()->value);
+				if(parentMap.size()>0){
+					std::vector<int> keys;
+					for (const auto& pair : parentMap) {
+						keys.push_back(std::stoi(pair.first));
+					}
+
+					// Ordenar as chaves de forma alfabética
+					std::sort(keys.begin(), keys.end());
+
+					// A última chave será a última no vetor ordenado
+					int lastKey = keys.back();
+					properKey = std::to_string(lastKey +1);
+				}
+			}
+            auto newNode = std::make_shared<TreeNode>(properKey, NodeType::ARRAY);
 			std::vector<std::string> result = split(line, ',');
 			// Imprime os resultados
 			for (const auto &token : result) {
