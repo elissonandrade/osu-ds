@@ -194,20 +194,29 @@ void OldOsuExporter::writeOldOsu(std::ofstream& outFile, const std::shared_ptr<T
 	}
 	
 	
-	const auto& eventsBreaks = std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(node->getChild("Events")->value);
-	int eventsCount = eventsBreaks.size();
-	WriteVarLength(outFile,eventsCount);
+	const auto& events = std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(node->getChild("Events")->value);
+	int eventsCount = events.size();
 	
 	std::cout << "Reached after timings" <<eventsCount<<std::endl;
+	
+	std::vector<std::vector<std::shared_ptr<TreeNode>>> eventsBreaks;
 	for (int i=0; i<eventsCount; i++ ) {
 		std::string strIndex = std::to_string(i);
-		const auto& ebProperties = std::get<std::vector<std::shared_ptr<TreeNode>>>(eventsBreaks.at(strIndex)->value);
-		const int startTime = std::get<double>(ebProperties.at(0)->value);
-		outFile.write(reinterpret_cast<const char*>(&startTime), sizeof(startTime));
-		const int endTime = std::get<double>(ebProperties.at(1)->value);
-		outFile.write(reinterpret_cast<const char*>(&endTime), sizeof(endTime));
+		const auto& ebProperties = std::get<std::vector<std::shared_ptr<TreeNode>>>(events.at(strIndex)->value);
+		if((ebProperties.at(0)->type == NodeType::STRING && std::get<std::string>(ebProperties.at(0)->value).compare("Break") == 0) ||
+		(ebProperties.at(0)->type == NodeType::NUMBER && std::get<double>(ebProperties.at(0)->value) == 2)){
+			eventsBreaks.push_back(ebProperties);
+		}
 	}
 	
+	WriteVarLength(outFile,eventsBreaks.size());
+	
+	for(const std::vector<std::shared_ptr<TreeNode>> &ebProperties : eventsBreaks) {
+		const int startTime = std::get<double>(ebProperties.at(1)->value);
+		outFile.write(reinterpret_cast<const char*>(&startTime), sizeof(startTime));
+		const int endTime = std::get<double>(ebProperties.at(2)->value);
+		outFile.write(reinterpret_cast<const char*>(&endTime), sizeof(endTime));
+	}
 		
 	const auto& hitObjects = std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(node->getChild("HitObjects")->value);
 	int hitObjectsCount = hitObjects.size();
