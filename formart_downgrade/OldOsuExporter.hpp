@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <utility>
 
 class OldOsuExporter {
 public:
@@ -21,6 +22,8 @@ private:
 	int DEGRESS_IN_CIRCLE = 32768;
 	uint8_t VERSION_ODS = 1;
 	
+    const double PI = 3.141592653589793;
+	
     std::string filePath;
 
     // Função auxiliar para escrever um nó
@@ -34,6 +37,20 @@ private:
 
     // Função para converter um número para bytes
     std::vector<uint8_t> doubleToBytes(double value);
+	
+	std::vector<std::pair<int, int>> parseNumberPairs(const std::string& input);
+	
+	std::vector<std::pair<int, int>> createSlider(const std::vector<std::pair<int, int>>& points);
+	
+	std::vector<std::pair<int, int>> createTicks(const std::vector<std::pair<int, int>>& points,const float spatialLength, const float difficultyMultiplier, const float sliderTick);
+	
+	float calcularDistancia(const std::pair<int, int>& p1, const std::pair<int, int>& p2);
+	
+	int calculateTravelSpeed(const std::shared_ptr<TreeNode>& node,const int startTime,const float spatialLength, const float difficultyMultiplier);
+	
+	int calculateAngle(const std::pair<int, int>& a, const std::pair<int, int>& b);
+	
+	std::pair<short, short> lerp(const std::pair<int, int>& a, const std::pair<int, int>& b, float amount);
 	
 	void WriteVarLength(std::ofstream& outFile, int length);
 	

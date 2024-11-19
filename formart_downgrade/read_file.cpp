@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cctype>
 #include <algorithm>
+#include <regex>
 
 // Função que divide a string com base no delimitador
 std::vector<std::string> split(const std::string &str, char delimiter) {
@@ -29,7 +30,8 @@ std::string trim(const std::string &str) {
 
 // Função para identificar o tipo de valor (número ou string)
 NodeValue parseValue(const std::string &value) {
-    if (std::isdigit(value[0]) || (value[0] == '-' && std::isdigit(value[1]))) {
+	std::regex pattern(R"(^\s*[-+]?\d*\.?\d+\s*$)");
+    if (std::regex_match(value, pattern)) {
         return std::stod(value);  // Valor numérico
     } else {
         return value;  // Valor string
@@ -108,8 +110,10 @@ void populateTreeFromFile(const std::string& filename, std::shared_ptr<TreeNode>
             nodeStack.back()->addChild(newNode);
             //nodeStack.push_back(newNode);
         } else if (line.empty() && nodeStack.size() > 1) {
-            // Fim de um objeto ou array
-            nodeStack.pop_back();
+			if(nodeStack.back()->type == NodeType::OBJECT){
+				// Fim de um objeto ou array
+				nodeStack.pop_back();
+			}
         } else if (delimiterPos != std::string::npos) {
             // Adicionando chave-valor
             NodeValue nodeValue = parseValue(value);// Determina o tipo de nó e cria o novo nó

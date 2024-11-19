@@ -1,6 +1,7 @@
 #include "OldOsuExporter.hpp"
 #include <iostream>
 #include <cstring>
+#include <sstream>
 #include <cmath>
 
 // Construtor
@@ -31,6 +32,128 @@ std::string OldOsuExporter::changeExtensionTo(const std::string& filename,const 
 
     // Adiciona a nova extensão ".ods"
     return baseName + "."+ extension;
+}
+
+std::vector<std::pair<int, int>> OldOsuExporter::parseNumberPairs(const std::string& input) {
+    std::vector<std::pair<int, int>> pairs;
+    
+    // Pular a primeira letra (X|) e começar a partir do índice 2
+    std::string data = input.substr(2); 
+
+    std::stringstream ss(data);
+    std::string pair;
+
+    // Separar a string pelos '|'
+    while (std::getline(ss, pair, '|')) {
+        // Encontrar o separador ':'
+        size_t pos = pair.find(':');
+        if (pos != std::string::npos) {
+            // Extrair e converter x e y para inteiros
+            int x = std::stoi(pair.substr(0, pos));
+            int y = std::stoi(pair.substr(pos + 1));
+            pairs.emplace_back(x, y);
+        }
+    }
+
+    return pairs;
+}
+
+std::vector<std::pair<int, int>> OldOsuExporter::createSlider(const std::vector<std::pair<int, int>>& points) {
+    std::vector<std::pair<int, int>> segments;
+
+    // Criar segmentos ligando pontos sucessivos
+	
+	const double threshold = 10;
+	segments.push_back(points[0]);
+	double total=0;
+    for (size_t i = 1; i < points.size(); ) {
+		double distance = this->calcularDistancia(segments.back(),points[i]);
+		if(total <= threshold ){
+			total += distance;
+		}
+		if(total > threshold){
+			float factor = (float)((distance+threshold-total)/distance);
+			segments.push_back(this->lerp(segments.back(), points[i],factor));
+			total -= threshold;
+		}
+		if (((int)this->calcularDistancia(segments.back(),points[i])) <= threshold){
+			i++;
+		}
+    }
+	if(((int)this->calcularDistancia(segments.back(),points[points.size()-1])) >0) {
+		segments.push_back(points[points.size()-1]);
+	}
+	
+    return segments;
+}
+
+std::vector<std::pair<int, int>> OldOsuExporter::createTicks(const std::vector<std::pair<int, int>>& points, const float spatialLength, const float difficultyMultiplier, const float sliderTick) {
+	std::vector<std::pair<int, int>> ticks;
+	
+	int length = (int) (100.0*difficultyMultiplier)/sliderTick;
+	int maxPoints = (((int)spatialLength) -1)/length;
+	
+	double total = 0;
+	std::cout << "Generatin ticks for " <<maxPoints<<" max points and a lenght of "<<length<<std::endl;
+	for(int i = 0; (ticks.size()< maxPoints )&& (i <(points.size() -1));i++ ){
+		total += this->calcularDistancia(points[i], points[i + 1]);
+		std::cout << "Creating tick for " <<total<<std::endl;
+		if(total >= length){
+			ticks.push_back(points[i + 1]);
+			total -= length;
+		}
+	}
+	return ticks;
+}	
+
+float OldOsuExporter::calcularDistancia(const std::pair<int, int>& p1, const std::pair<int, int>& p2) {
+    return std::sqrt(std::pow(p2.first - p1.first, 2) + std::pow(p2.second - p1.second, 2));
+}
+
+std::pair<short, short> OldOsuExporter::lerp(const std::pair<int, int>& a, const std::pair<int, int>& b, float amount) {
+	std::pair<short, short> v;
+	v.first = (short) (a.first + (b.first - a.first)*amount);
+	v.second = (short) (a.second + (b.second - a.second)*amount);
+	std::cout << "Estimated point (" <<v.first<<","<<v.second<<") considering amount of "<<amount<<std::endl;
+	return v;
+}
+
+int OldOsuExporter::calculateTravelSpeed(const std::shared_ptr<TreeNode>& node, const int startTime, const float spatialLength, const float difficultyMultiplier){
+	
+	const auto& timingPoints = std::get<std::unordered_map<std::string, std::shared_ptr<TreeNode>>>(node->getChild("TimingPoints")->value);
+	int tpCount = timingPoints.size();
+	// Escreve primeiro timing point
+	double realBeatLength = std::get<double>(
+							std::get<std::vector<std::shared_ptr<TreeNode>>>(timingPoints.at("0")->value).at(1)->value);
+	int currentTime = 0;
+	double inheritedLength = -1;
+	for (int i=0; i<tpCount; i++ ) {
+		std::string strIndex = std::to_string(i);
+		const auto& tpProperties = std::get<std::vector<std::shared_ptr<TreeNode>>>(timingPoints.at(strIndex)->value);
+		const int offset = std::get<double>(tpProperties.at(0)->value);
+		currentTime += offset;
+		if(currentTime > startTime){
+			break;
+		}
+		const float beatLength = std::get<double>(tpProperties.at(1)->value);
+		if(beatLength > 0){
+			realBeatLength = beatLength;
+			inheritedLength = -1;
+		}else {
+			inheritedLength = realBeatLength*(-100/beatLength);
+		}
+		
+	}
+	
+	if(inheritedLength < 0){
+		inheritedLength = realBeatLength;
+	}
+	
+	return (int) inheritedLength*spatialLength/(100*difficultyMultiplier);
+}
+
+int OldOsuExporter::calculateAngle(const std::pair<int, int>& a, const std::pair<int, int>& b){
+	return (int)(DEGRESS_IN_CIRCLE*atan2(b.second - a.second, b.first - a.first)/(2*PI));
 }
 
 void OldOsuExporter::WriteVarLength(std::ofstream& outFile, int length) {
@@ -115,6 +238,7 @@ void OldOsuExporter::writeOldOsu(std::ofstream& outFile, const std::shared_ptr<T
 	
     outFile.write(reinterpret_cast<const char*>(&VERSION_ODS), sizeof(VERSION_ODS));
 	auto meta = node->getChild("Metadata");
+	std::cout << "Reading metadata" <<std::endl;
 	auto title = meta->getChild("TitleUnicode");
 	if(title.use_count() == 0){
 		title = meta->getChild("Title");
@@ -138,13 +262,14 @@ void OldOsuExporter::writeOldOsu(std::ofstream& outFile, const std::shared_ptr<T
     WriteVarString(outFile, strVersion);
 	
 	auto general = node->getChild("General");
+	std::cout << "Reading filename" <<std::endl;
 	auto audioFile = general->getChild("AudioFilename");
 	std::string strAudioFile = std::get<std::string>(audioFile->value);
 	strAudioFile.erase(0, strAudioFile.find_first_not_of(' '));
 	
     WriteVarString(outFile, OldOsuExporter::changeExtensionTo(strAudioFile,"raw"));
 	
-	std::cout << "Reached here" <<strTitle<<std::endl;
+	std::cout << "Read metadata of " <<strTitle<<std::endl;
 	
 	auto difficulty = node->getChild("Difficulty");
 	
@@ -236,9 +361,71 @@ void OldOsuExporter::writeOldOsu(std::ofstream& outFile, const std::shared_ptr<T
 		outFile.write(reinterpret_cast<const char*>(&yOsu), sizeof(yOsu));
 		const uint8_t sound = std::get<double>(hoProperties.at(4)->value);
 		outFile.write(reinterpret_cast<const char*>(&sound), sizeof(sound));
-		if(hoType == 3){//spinners
+		const uint8_t spinnerMask = 1<<3;
+		const uint8_t sliderMask = 1<<1;
+		
+		if((spinnerMask & hoType) != 0){//spinners
+			std::cout << "Found spinner on " <<i<<std::endl;
 			const int endTime = std::get<double>(hoProperties.at(5)->value);
 			outFile.write(reinterpret_cast<const char*>(&endTime), sizeof(endTime));
+		} else if((sliderMask & hoType) != 0){//sliders
+			std::cout << "Found slider on " <<i<<std::endl;
+			
+			const short repeats = std::get<double>(hoProperties.at(6)->value);
+			outFile.write(reinterpret_cast<const char*>(&repeats), sizeof(repeats));
+			
+			const float spatialLength = std::get<double>(hoProperties.at(7)->value);			
+			const int travelSpeed = calculateTravelSpeed(node,startTime,spatialLength,sliderMulti);
+			outFile.write(reinterpret_cast<const char*>(&travelSpeed), sizeof(travelSpeed));
+			
+			std::cout << "Calculate travel speed of " <<travelSpeed<<std::endl;
+			
+			const std::string strPoints = std::get<std::string>(hoProperties.at(5)->value);
+			 // Obter os pares de números
+			std::vector<std::pair<int, int>> points = this->parseNumberPairs(strPoints);
+			points.insert(points.begin(),std::pair<int, int>(xOsu,yOsu));
+			
+			// Criar segmentos
+			auto segments = this->createSlider(points);
+			const short segmentCount = segments.size() -1;
+			
+			std::cout << "Created segment vetor of size " <<segmentCount<<std::endl;
+			WriteVarLength(outFile,segmentCount+1);
+			
+			int angle = 0;
+			for (int i = 0; i <= segmentCount; i++)
+			{
+				short xLocal = (short)segments[i].first;
+				short yLocal = (short)segments[i].second;
+				outFile.write(reinterpret_cast<const char*>(&xLocal),sizeof(short));
+				outFile.write(reinterpret_cast<const char*>(&yLocal),sizeof(short));
+
+				if (i < segmentCount){
+					angle = this->calculateAngle(segments[i], segments[i + 1]);
+				}
+				outFile.write(reinterpret_cast<const char*>(&angle),sizeof(int));
+				
+				std::cout << "On point (" <<xLocal<<","<<yLocal<<") calculate a angle of "<<angle<<std::endl;
+			}
+			
+			
+			std::cout << "Filled segments, now using ticks for " <<sliderTick<<std::endl;
+			auto ticks = this->createTicks(segments,spatialLength,sliderMulti,sliderTick);
+			
+			size_t ticksCount = ticks.size();
+			
+			std::cout << "Created tick vetor of size " <<ticksCount<<std::endl;
+			WriteVarLength(outFile,ticksCount);
+			
+			for (int i = 0; i < ticksCount; i++)
+			{
+				short xLocal = (short)ticks[i].first;
+				short yLocal = (short)ticks[i].second;
+				outFile.write(reinterpret_cast<const char*>(&xLocal),sizeof(short));
+				outFile.write(reinterpret_cast<const char*>(&yLocal),sizeof(short));
+
+				
+			}
 		}
 	}
 	
