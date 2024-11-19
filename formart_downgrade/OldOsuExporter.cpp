@@ -7,6 +7,117 @@
 // Construtor
 OldOsuExporter::OldOsuExporter(const std::string& filePath) : filePath(filePath) {}
 
+// Função para calcular um ponto da curva de Bézier cúbica
+Point OldOsuExporter::bezierPoint(float t, const Point& p0, const Point& p1, const Point& p2, const Point& p3) {
+    float x = std::pow(1 - t, 3) * p0.first +
+              3 * std::pow(1 - t, 2) * t * p1.first +
+              3 * (1 - t) * std::pow(t, 2) * p2.first +
+              std::pow(t, 3) * p3.first;
+
+    float y = std::pow(1 - t, 3) * p0.second +
+              3 * std::pow(1 - t, 2) * t * p1.second +
+              3 * (1 - t) * std::pow(t, 2) * p2.second +
+              std::pow(t, 3) * p3.second;
+
+    return {x, y};
+}
+
+// Função para gerar pontos na curva de Bézier com base nos pontos de controle
+std::vector<std::pair<int, int>> OldOsuExporter::generateBezierCurve(const Point& p0, const Point& p1, const Point& p2, const Point& p3) {
+    std::vector<std::pair<int, int>> curvePoints;
+
+    // Adiciona o ponto inicial
+    curvePoints.push_back(std::pair<int, int>((int)p0.first,(int)p0.second));
+
+    // Incremento de t para gerar pontos ao longo da curva
+    float tStep = 0.01; // 100 pontos ao longo da curva
+    float maxDistance = 10.0; // Distância máxima entre pontos consecutivos
+
+    Point lastPoint = p0;
+    for (float t = tStep; t <= 1.0; t += tStep) {
+        Point currentPoint = bezierPoint(t, p0, p1, p2, p3);
+
+        // Calcula a distância euclidiana entre os pontos
+        float distance = std::sqrt(
+            std::pow(currentPoint.first - lastPoint.first, 2) +
+            std::pow(currentPoint.second - lastPoint.second, 2)
+        );
+
+        // Se a distância for maior que o limite, adicionar o ponto
+        if (distance <= maxDistance) {
+            curvePoints.push_back(std::pair<int, int>((int)currentPoint.first,(int)currentPoint.second));
+            lastPoint = currentPoint;
+        }
+    }
+
+    // Adiciona o ponto final
+    curvePoints.push_back(std::pair<int, int>((int)p3.first,(int)p3.second));
+
+    return curvePoints;
+}
+
+std::pair<Point, float> OldOsuExporter::findCircle(const Point& p1, const Point& p2, const Point& p3) {
+    float x1 = p1.first, y1 = p1.second;
+    float x2 = p2.first, y2 = p2.second;
+    float x3 = p3.first, y3 = p3.second;
+
+    // Calcula os determinantes
+    float A = x1 * (y2 - y3) - y1 * (x2 - x3) + x2 * y3 - x3 * y2;
+    float B = (x1 * x1 + y1 * y1) * (y3 - y2) +
+              (x2 * x2 + y2 * y2) * (y1 - y3) +
+              (x3 * x3 + y3 * y3) * (y2 - y1);
+
+    float C = (x1 * x1 + y1 * y1) * (x2 - x3) +
+              (x2 * x2 + y2 * y2) * (x3 - x1) +
+              (x3 * x3 + y3 * y3) * (x1 - x2);
+
+    float D = (x1 * x1 + y1 * y1) * (x3 * y2 - x2 * y3) +
+              (x2 * x2 + y2 * y2) * (x1 * y3 - x3 * y1) +
+              (x3 * x3 + y3 * y3) * (x2 * y1 - x1 * y2);
+
+    float cx = -B / (2 * A);
+    float cy = -C / (2 * A);
+    float radius = std::sqrt((B * B + C * C - 4 * A * D) / (4 * A * A));
+
+    return {{cx, cy}, radius};
+}
+
+// Função para calcular o ângulo entre o centro e um ponto
+float OldOsuExporter::angleBetween(const Point& center, const Point& point) {
+    return std::atan2(point.second - center.second, point.first - center.first);
+}
+
+// Função para gerar uma curva circular a partir de três pontos
+std::vector<std::pair<int, int>> OldOsuExporter::generateCircularCurve(const Point& p1, const Point& p2, const Point& p3, float maxDistance) {
+    std::vector<std::pair<int, int>> curvePoints;
+    auto [center, radius] = findCircle(p1, p2, p3);
+
+    float startAngle = angleBetween(center, p1);
+    float midAngle = angleBetween(center, p2);
+    float endAngle = angleBetween(center, p3);
+
+    // Ajuste dos ângulos para manter a direção correta
+    if (startAngle > endAngle) {
+        endAngle += 2 * PI;
+    }
+    if (startAngle > midAngle) {
+        midAngle += 2 * PI;
+    }
+
+    // Incremento de ângulo para gerar pontos ao longo da curva
+    float angleStep = maxDistance / radius;
+    //angleStep = std::min(angleStep, 0.1f); // Para uma resolução alta da curva
+
+    // Gerando os pontos ao longo do arco
+    for (float angle = startAngle; angle <= endAngle; angle += angleStep) {
+        float x = center.first + radius * std::cos(angle);
+        float y = center.second + radius * std::sin(angle);
+        curvePoints.push_back({x, y});
+    }
+
+    return curvePoints;
+}
+
 // Função auxiliar para converter uma string em bytes
 std::vector<uint8_t> OldOsuExporter::stringToBytes(const std::string& str) {
     std::vector<uint8_t> bytes(str.begin(), str.end());
@@ -381,12 +492,22 @@ void OldOsuExporter::writeOldOsu(std::ofstream& outFile, const std::shared_ptr<T
 			std::cout << "Calculate travel speed of " <<travelSpeed<<std::endl;
 			
 			const std::string strPoints = std::get<std::string>(hoProperties.at(5)->value);
-			 // Obter os pares de números
+			// Obter os pares de números
 			std::vector<std::pair<int, int>> points = this->parseNumberPairs(strPoints);
+			
 			points.insert(points.begin(),std::pair<int, int>(xOsu,yOsu));
 			
 			// Criar segmentos
-			auto segments = this->createSlider(points);
+			std::vector<std::pair<int, int>> segments;
+			
+			if(strPoints.at(0) == 'B'){
+				segments = this->generateBezierCurve(points[0],points[1],points[2],points[3]);
+				
+			} else if(strPoints.at(0) == 'P'){
+				segments = generateCircularCurve(points[0],points[1],points[2]);
+			} else {
+				segments = this->createSlider(points);
+			}
 			const short segmentCount = segments.size() -1;
 			
 			std::cout << "Created segment vetor of size " <<segmentCount<<std::endl;

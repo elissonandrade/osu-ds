@@ -7,6 +7,8 @@
 #include <string>
 #include <utility>
 
+using Point = std::pair<float, float>;
+
 class OldOsuExporter {
 public:
     // Construtor que recebe o caminho para o arquivo de exportação
@@ -49,6 +51,16 @@ private:
 	int calculateTravelSpeed(const std::shared_ptr<TreeNode>& node,const int startTime,const float spatialLength, const float difficultyMultiplier);
 	
 	int calculateAngle(const std::pair<int, int>& a, const std::pair<int, int>& b);
+	
+	Point bezierPoint(float t, const Point& p0, const Point& p1, const Point& p2, const Point& p3);
+	
+	std::vector<std::pair<int, int>> generateBezierCurve(const Point& p0, const Point& p1, const Point& p2, const Point& p3);
+	
+	std::vector<std::pair<int, int>> generateCircularCurve(const Point& p1, const Point& p2, const Point& p3, float maxDistance = 10.0f);
+	
+	float angleBetween(const Point& center, const Point& point);
+	
+	std::pair<Point, float> findCircle(const Point& p1, const Point& p2, const Point& p3);
 	
 	std::pair<short, short> lerp(const std::pair<int, int>& a, const std::pair<int, int>& b, float amount);
 	
