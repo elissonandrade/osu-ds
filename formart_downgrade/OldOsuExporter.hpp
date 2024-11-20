@@ -60,6 +60,8 @@ private:
 	
 	float angleBetween(const Point& center, const Point& point);
 	
+	float normalizeAngle(float angle);
+	
 	std::pair<Point, float> findCircle(const Point& p1, const Point& p2, const Point& p3);
 	
 	std::pair<short, short> lerp(const std::pair<int, int>& a, const std::pair<int, int>& b, float amount);

@@ -87,33 +87,47 @@ float OldOsuExporter::angleBetween(const Point& center, const Point& point) {
     return std::atan2(point.second - center.second, point.first - center.first);
 }
 
+
+// Normaliza o ângulo para o intervalo [0, 2π]
+float OldOsuExporter::normalizeAngle(float angle) {
+    while (angle < 0) angle += 2 * PI;
+    while (angle >= 2 * PI) angle -= 2 * PI;
+    return angle;
+}
+
 // Função para gerar uma curva circular a partir de três pontos
 std::vector<std::pair<int, int>> OldOsuExporter::generateCircularCurve(const Point& p1, const Point& p2, const Point& p3, float maxDistance) {
     std::vector<std::pair<int, int>> curvePoints;
     auto [center, radius] = findCircle(p1, p2, p3);
 
-    float startAngle = angleBetween(center, p1);
-    float midAngle = angleBetween(center, p2);
-    float endAngle = angleBetween(center, p3);
-
-    // Ajuste dos ângulos para manter a direção correta
-    if (startAngle > endAngle) {
-        endAngle += 2 * PI;
-    }
-    if (startAngle > midAngle) {
-        midAngle += 2 * PI;
-    }
+    float startAngle = normalizeAngle(angleBetween(center, p1));
+    float midAngle = normalizeAngle(angleBetween(center, p2));
+    float endAngle = normalizeAngle(angleBetween(center, p3));
 
     // Incremento de ângulo para gerar pontos ao longo da curva
     float angleStep = maxDistance / radius;
+	
+    // Determina a direção da curva (anti-horária ou horária)
+    bool clockwise = (endAngle > startAngle) ^ (midAngle > startAngle) ^ (midAngle > endAngle);
+
+    if (clockwise) {
+        if (startAngle < endAngle) startAngle += 2 * PI;
+		angleStep = -angleStep;
+        //std::swap(startAngle, endAngle);
+    } else {
+        if (endAngle < startAngle) endAngle += 2 * PI;
+    }
     //angleStep = std::min(angleStep, 0.1f); // Para uma resolução alta da curva
 
+    
+    //curvePoints.push_back(p1);
     // Gerando os pontos ao longo do arco
-    for (float angle = startAngle; angle <= endAngle; angle += angleStep) {
+    for (float angle = startAngle; clockwise ? angle >= endAngle : angle <= endAngle; angle += angleStep) {
         float x = center.first + radius * std::cos(angle);
         float y = center.second + radius * std::sin(angle);
         curvePoints.push_back({x, y});
     }
+    //curvePoints.push_back(p3);
 
     return curvePoints;
 }
