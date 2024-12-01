@@ -7,6 +7,8 @@ Beatmap::Beatmap(const char* filename, const char* basedir)
 	mFilename = filename;
 	mBaseDir = basedir;
 	mReader = NULL;
+
+	mChecksumString = "";
 	
 	FileReader r(filename);
 	
@@ -16,6 +18,7 @@ Beatmap::Beatmap(const char* filename, const char* basedir)
 		char id[4] = { r.ReadInt8(), r.ReadInt8(), r.ReadInt8(), 0 };
 		if (strcmp(id, "ODS") == 0)
 		{
+			
 			u8 odsver = r.ReadInt8();
 			
 			mTitle = r.ReadString();
@@ -23,8 +26,9 @@ Beatmap::Beatmap(const char* filename, const char* basedir)
 			mCreator = r.ReadString();
 			mVersion = r.ReadString();
 			mAudioFilename = r.ReadString();
-			
+				
 			fLoadable = true;
+		} else {
 		}
 	}
 	
@@ -38,7 +42,7 @@ void Beatmap::Initialize()
 		if (!fLoadable)
 		{
 			iprintf("\x1b[0;0Hcannot load this file");
-			return;
+			//return;
 		}
 		
 		chdir(mBaseDir.c_str());
@@ -47,14 +51,13 @@ void Beatmap::Initialize()
 		//skip header
 		mReader->Skip(3);
 		
-		u8 odsver = mReader->ReadInt8();
+		odsver = mReader->ReadInt8();
 		
 		mTitle = mReader->ReadString();
 		mArtist = mReader->ReadString();
 		mCreator = mReader->ReadString();
 		mVersion = mReader->ReadString();
 		mAudioFilename = mReader->ReadString();
-        nocashMessage(mAudioFilename.c_str());
 		
 		DifficultyManager::DifficultyHpDrain = mReader->ReadInt8();
 		DifficultyManager::DifficultyCircleSize = mReader->ReadInt8();
@@ -75,10 +78,8 @@ void Beatmap::Initialize()
 			BeatmapElements::Element().AddTimingPoint(time, beattime, samplesetid);
 		}
 
-        nocashMessage("hio\n");
-
 		u32 breakcount = mReader->ReadVarInt();
-        nocashMessage(std::to_string(breakcount).c_str());
+
 		for (u32 j=0; j<breakcount; ++j)
 		{
 			s32 starttime = mReader->ReadInt32();
@@ -87,26 +88,7 @@ void Beatmap::Initialize()
 			BeatmapElements::Element().AddBreakPoint(starttime, endtime);
 		}
 
-        nocashMessage("hio\n");
-
 		iprintf("\x1b[2J");
-		mHitObjectCount = mReader->ReadVarInt();
-		mHitObjectRead = 0;
-		mLastObjectEndTime = 0;
-		mForceNewCombo = true;
-		
-		//read ahead
-		ReadNextObject();
-		mFirstObjectTime = mNextObjectTime;
-		
-		//the time to skip to is the first object - 8 beats
-		mSkipTime = MathHelper::Max(0, (s32)mNextObjectTime - (BeatmapElements::Element().GetTimingPoint(mNextObjectTime).BeatTime*8));
-		
-		//strangely calling this in ctor of BeatmapElements causes game to not load :/
-		BeatmapElements::Element().ResetColours(true);
-		
-		//now we can play this map
-		fReady = true;
 	}
 }
 
@@ -124,6 +106,34 @@ Beatmap::~Beatmap()
 {
 	if (mReader != NULL)
 		delete mReader;
+}
+
+void Beatmap::InitBG() {
+	if (odsver > 1) {
+		for (int i = 0; i < 256 * 192; i++) {
+			*(u16 *) (BG_BMP_RAM(8) + i) = mReader->ReadInt16();
+		}
+		bgUpdate();
+		bgSetPriority(2, 1);
+	}
+
+	mHitObjectCount = mReader->ReadVarInt();
+	mHitObjectRead = 0;
+	mLastObjectEndTime = 0;
+	mForceNewCombo = true;
+
+	//read ahead
+	ReadNextObject();
+	mFirstObjectTime = mNextObjectTime;
+
+	//the time to skip to is the first object - 8 beats
+	mSkipTime = MathHelper::Max(0, (s32)mNextObjectTime - (BeatmapElements::Element().GetTimingPoint(mNextObjectTime).BeatTime*8));
+
+	//strangely calling this in ctor of BeatmapElements causes game to not load :/
+	BeatmapElements::Element().ResetColours(true);
+
+	//now we can play this map
+	fReady = true;
 }
 
 void Beatmap::Buffer(list<HitObject*>& hitObjectList)
@@ -166,7 +176,7 @@ void Beatmap::Buffer(list<HitObject*>& hitObjectList)
 				u32 lengthtime = mReader->ReadInt32();
 				
 				u32 pointcount = mReader->ReadVarInt();
-				vector<HitObjectPoint*> points;
+				std::vector<HitObjectPoint*> points;
 				points.reserve(pointcount);
 				
 				for (u32 i=0; i<pointcount; ++i)
@@ -180,7 +190,7 @@ void Beatmap::Buffer(list<HitObject*>& hitObjectList)
 				}
 				
 				u32 tickcount = mReader->ReadVarInt();
-				vector<HitObjectPoint*> ticks;
+				std::vector<HitObjectPoint*> ticks;
 				ticks.reserve(tickcount);
 				
 				for (u32 i=0; i<tickcount; ++i)
@@ -242,4 +252,8 @@ void Beatmap::ReadNextObject()
 }
 
 
-
+std::string& Beatmap::BeatmapChecksum() {
+	std::string checksum = "";
+	//TODO: figure out some way to uniquely identify every beatmap without it being too intensive
+	return checksum;
+}
