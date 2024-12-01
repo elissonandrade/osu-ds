@@ -136,7 +136,7 @@ void Beatmap::InitBG() {
 	fReady = true;
 }
 
-void Beatmap::Buffer(list<HitObject*>& hitObjectList)
+void Beatmap::Buffer(std::list<HitObject*>& hitObjectList)
 {
 	if (!fReady)
 	{
