@@ -409,7 +409,7 @@ void OldOsuExporter::writeOldOsu(std::ofstream& outFile, const std::shared_ptr<T
     outFile.write(reinterpret_cast<const char*>(&sliderMulti), sizeof(sliderMulti));
 	const float sliderTick = std::get<double>(difficulty->getChild("SliderTickRate")->value);
     outFile.write(reinterpret_cast<const char*>(&sliderTick), sizeof(sliderTick));
-	const float hpDrop = 5.0;
+	const float hpDrop = 0.005;
     outFile.write(reinterpret_cast<const char*>(&hpDrop), sizeof(hpDrop));
 	const uint8_t peppyStars = 5;
     outFile.write(reinterpret_cast<const char*>(&peppyStars), sizeof(peppyStars));
